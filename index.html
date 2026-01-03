@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chaos Lab: Ultimate Sequencer</title>
+    <title>Chaos Lab: Sequencer + Graph</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/midi-player-js@2.0.16/browser/midiplayer.min.js"></script>
     <style>
@@ -34,7 +34,7 @@
 
 <div id="audio-unlock" onclick="unlockAudio()">
     <h2 style="color:var(--accent)">INITIALIZE SYSTEM</h2>
-    <p>Tap to start Sequencer & Physics</p>
+    <p>Tap to start Sequencer + Collision Graph</p>
 </div>
 
 <button id="toggle-ui" onclick="toggleUI()">UI</button>
@@ -44,6 +44,14 @@
     <button class="btn" style="background: #333; color: white; margin-top: 8px;" onclick="document.getElementById('midi-upload').click()">LOAD MIDI FILE</button>
     <div id="midi-status" style="font-size: 8px; color: #00ff00; text-align: center; margin-top: 3px;">No MIDI</div>
     <input type="file" id="midi-upload" accept=".mid,.midi" style="display:none">
+
+    <h4>Graph Settings</h4>
+    <div class="section">
+        <label>Show Graph</label>
+        <input type="checkbox" id="show-graph" checked>
+        <label>Graph Opacity <span id="v-gopac">0.5</span></label>
+        <input type="range" id="graph-opac" min="0" max="1" step="0.1" value="0.5">
+    </div>
 
     <h4>Ball & Outline</h4>
     <div class="section">
@@ -95,6 +103,7 @@ canvas.width = 1080; canvas.height = 1920;
 const centerX = 540, centerY = 960, arenaRadius = 475;
 
 let midiNotes = [], noteIndex = 0, colorTimer = 0, synth, audioDest;
+let collisionData = new Array(100).fill(0); // For the graph
 
 const settings = {
     bgColor: '#050505',
@@ -107,7 +116,9 @@ const settings = {
     sizeInc: 0,
     ballStroke: '#ffffff',
     strokeWidth: 3,
-    glowPower: 40
+    glowPower: 40,
+    showGraph: true,
+    graphOpac: 0.5
 };
 
 const ball = { x: centerX, y: centerY, vx: 10, vy: 5, radius: 30, baseRadius: 30, glow: 0, currentColor: '#00f2ff' };
@@ -131,6 +142,7 @@ function toggleUI() {
 function resetSim() {
     ball.x = centerX; ball.y = centerY; ball.vx = 10; ball.vy = 5;
     ball.radius = ball.baseRadius; noteIndex = 0;
+    collisionData.fill(0);
     ctx.fillStyle = settings.bgColor;
     ctx.fillRect(0, 0, 1080, 1920);
 }
@@ -155,6 +167,10 @@ function update() {
     const dx = ball.x - centerX, dy = ball.y - centerY;
     const dist = Math.sqrt(dx*dx + dy*dy);
 
+    // Push 0 into graph by default
+    collisionData.push(0);
+    collisionData.shift();
+
     if (dist + ball.radius > arenaRadius) {
         const nx = dx / dist, ny = dy / dist;
         const dot = ball.vx * nx + ball.vy * ny;
@@ -166,7 +182,9 @@ function update() {
         ball.radius = Math.max(5, ball.radius + settings.sizeInc);
         ball.vx *= settings.speedMult; ball.vy *= settings.speedMult;
 
-        // SEQUENTIAL MIDI LOGIC (Meglovania Fix)
+        // Add peak to graph
+        collisionData[collisionData.length-1] = Math.abs(ball.vx) + Math.abs(ball.vy);
+
         if (midiNotes.length > 0) {
             synth.triggerAttackRelease(midiNotes[noteIndex].note, "8n");
             noteIndex = (noteIndex + 1) % midiNotes.length;
@@ -194,7 +212,33 @@ function draw() {
         ctx.stroke();
     }
     ctx.restore();
+
+    if(settings.showGraph) drawGraph();
 }
+
+function drawGraph() {
+    const graphWidth = 600;
+    const graphHeight = 150;
+    const xBase = 540 - (graphWidth/2);
+    const yBase = 1800;
+
+    ctx.save();
+    ctx.globalAlpha = settings.graphOpac;
+    ctx.strokeStyle = varToHex(settings.palette[0] || "#fff");
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    
+    for(let i=0; i<collisionData.length; i++) {
+        const x = xBase + (i * (graphWidth / collisionData.length));
+        const y = yBase - (collisionData[i] * 2);
+        if(i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.restore();
+}
+
+function varToHex(v) { return v; }
 
 function loop() { update(); draw(); requestAnimationFrame(loop); }
 
@@ -210,7 +254,6 @@ function renderPalette() {
 }
 function addColor() { settings.palette.push('#ffffff'); renderPalette(); }
 
-// MIDI Sequencing Fix
 document.getElementById('midi-upload').onchange = (e) => {
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -224,7 +267,6 @@ document.getElementById('midi-upload').onchange = (e) => {
                 }
             });
         });
-        // Sort by timing to fix melody sequence
         events.sort((a, b) => a.tick - b.tick);
         midiNotes = events;
         noteIndex = 0;
@@ -233,7 +275,9 @@ document.getElementById('midi-upload').onchange = (e) => {
     reader.readAsArrayBuffer(e.target.files[0]);
 };
 
-// Controls
+// UI Listeners
+document.getElementById('show-graph').onchange = (e) => settings.showGraph = e.checked;
+document.getElementById('graph-opac').oninput = (e) => { settings.graphOpac = parseFloat(e.target.value); document.getElementById('v-gopac').innerText = settings.graphOpac; };
 document.getElementById('ball-stroke').oninput = (e) => settings.ballStroke = e.target.value;
 document.getElementById('stroke-width').oninput = (e) => { settings.strokeWidth = parseInt(e.target.value); document.getElementById('v-swidth').innerText = settings.strokeWidth; };
 document.getElementById('glow-power').oninput = (e) => { settings.glowPower = parseInt(e.target.value); document.getElementById('v-glow').innerText = settings.glowPower; };
@@ -245,7 +289,6 @@ document.getElementById('grow-amt').oninput = (e) => { settings.sizeInc = parseF
 document.getElementById('trail-persist').oninput = (e) => { settings.persistence = parseFloat(e.target.value); document.getElementById('v-persist').innerText = settings.persistence.toFixed(2); };
 document.getElementById('bg-color').oninput = (e) => settings.bgColor = e.target.value;
 
-// Video Compilation
 let mediaRecorder, recordedChunks = [];
 document.getElementById('record-btn').onclick = () => {
     if (mediaRecorder && mediaRecorder.state === "recording") {
@@ -261,7 +304,7 @@ document.getElementById('record-btn').onclick = () => {
             const blob = new Blob(recordedChunks, { type });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = `chaos_final_${Date.now()}.${type.includes('mp4')?'mp4':'webm'}`;
+            a.download = `chaos_graph_${Date.now()}.${type.includes('mp4')?'mp4':'webm'}`;
             a.click();
         };
         mediaRecorder.start();
@@ -273,5 +316,3 @@ renderPalette();
 </script>
 </body>
 </html>
-
-
