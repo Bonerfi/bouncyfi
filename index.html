@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chaos Lab: Sequencer + Graph</title>
+    <title>Chaos Lab: Collision Tracker</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/midi-player-js@2.0.16/browser/midiplayer.min.js"></script>
     <style>
@@ -34,7 +34,7 @@
 
 <div id="audio-unlock" onclick="unlockAudio()">
     <h2 style="color:var(--accent)">INITIALIZE SYSTEM</h2>
-    <p>Tap to start Sequencer + Collision Graph</p>
+    <p>Tap to start Sequencer + Growth Graph</p>
 </div>
 
 <button id="toggle-ui" onclick="toggleUI()">UI</button>
@@ -45,12 +45,13 @@
     <div id="midi-status" style="font-size: 8px; color: #00ff00; text-align: center; margin-top: 3px;">No MIDI</div>
     <input type="file" id="midi-upload" accept=".mid,.midi" style="display:none">
 
-    <h4>Graph Settings</h4>
+    <h4>Collision Graph</h4>
     <div class="section">
-        <label>Show Graph</label>
+        <label>Show Growth Graph</label>
         <input type="checkbox" id="show-graph" checked>
         <label>Graph Opacity <span id="v-gopac">0.5</span></label>
         <input type="range" id="graph-opac" min="0" max="1" step="0.1" value="0.5">
+        <div style="font-size: 9px; color: var(--accent); margin-top: 5px;">Total Hits: <span id="hit-count">0</span></div>
     </div>
 
     <h4>Ball & Outline</h4>
@@ -103,7 +104,8 @@ canvas.width = 1080; canvas.height = 1920;
 const centerX = 540, centerY = 960, arenaRadius = 475;
 
 let midiNotes = [], noteIndex = 0, colorTimer = 0, synth, audioDest;
-let collisionData = new Array(100).fill(0); // For the graph
+let totalCollisions = 0;
+let collisionHistory = new Array(200).fill(0); // For the rolling growth graph
 
 const settings = {
     bgColor: '#050505',
@@ -142,7 +144,9 @@ function toggleUI() {
 function resetSim() {
     ball.x = centerX; ball.y = centerY; ball.vx = 10; ball.vy = 5;
     ball.radius = ball.baseRadius; noteIndex = 0;
-    collisionData.fill(0);
+    totalCollisions = 0;
+    collisionHistory.fill(0);
+    document.getElementById('hit-count').innerText = "0";
     ctx.fillStyle = settings.bgColor;
     ctx.fillRect(0, 0, 1080, 1920);
 }
@@ -167,9 +171,9 @@ function update() {
     const dx = ball.x - centerX, dy = ball.y - centerY;
     const dist = Math.sqrt(dx*dx + dy*dy);
 
-    // Push 0 into graph by default
-    collisionData.push(0);
-    collisionData.shift();
+    // Update History (Rolling data)
+    collisionHistory.push(totalCollisions);
+    collisionHistory.shift();
 
     if (dist + ball.radius > arenaRadius) {
         const nx = dx / dist, ny = dy / dist;
@@ -182,8 +186,9 @@ function update() {
         ball.radius = Math.max(5, ball.radius + settings.sizeInc);
         ball.vx *= settings.speedMult; ball.vy *= settings.speedMult;
 
-        // Add peak to graph
-        collisionData[collisionData.length-1] = Math.abs(ball.vx) + Math.abs(ball.vy);
+        // COLLISION COUNT GROWTH
+        totalCollisions++;
+        document.getElementById('hit-count').innerText = totalCollisions;
 
         if (midiNotes.length > 0) {
             synth.triggerAttackRelease(midiNotes[noteIndex].note, "8n");
@@ -213,34 +218,33 @@ function draw() {
     }
     ctx.restore();
 
-    if(settings.showGraph) drawGraph();
+    if(settings.showGraph) drawGrowthGraph();
 }
 
-function drawGraph() {
-    const graphWidth = 600;
-    const graphHeight = 150;
+function drawGrowthGraph() {
+    const graphWidth = 800;
+    const graphHeight = 200;
     const xBase = 540 - (graphWidth/2);
     const yBase = 1800;
 
     ctx.save();
     ctx.globalAlpha = settings.graphOpac;
-    ctx.strokeStyle = varToHex(settings.palette[0] || "#fff");
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = settings.ballStroke;
+    ctx.lineWidth = 3;
     ctx.beginPath();
     
-    for(let i=0; i<collisionData.length; i++) {
-        const x = xBase + (i * (graphWidth / collisionData.length));
-        const y = yBase - (collisionData[i] * 2);
+    // Scale graph based on total hits
+    const maxVal = Math.max(50, totalCollisions);
+    
+    for(let i=0; i < collisionHistory.length; i++) {
+        const x = xBase + (i * (graphWidth / collisionHistory.length));
+        const y = yBase - (collisionHistory[i] / maxVal * graphHeight);
         if(i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
     }
     ctx.stroke();
     ctx.restore();
 }
-
-function varToHex(v) { return v; }
-
-function loop() { update(); draw(); requestAnimationFrame(loop); }
 
 function renderPalette() {
     const list = document.getElementById('palette-list');
@@ -276,7 +280,7 @@ document.getElementById('midi-upload').onchange = (e) => {
 };
 
 // UI Listeners
-document.getElementById('show-graph').onchange = (e) => settings.showGraph = e.checked;
+document.getElementById('show-graph').onchange = (e) => settings.showGraph = e.target.checked;
 document.getElementById('graph-opac').oninput = (e) => { settings.graphOpac = parseFloat(e.target.value); document.getElementById('v-gopac').innerText = settings.graphOpac; };
 document.getElementById('ball-stroke').oninput = (e) => settings.ballStroke = e.target.value;
 document.getElementById('stroke-width').oninput = (e) => { settings.strokeWidth = parseInt(e.target.value); document.getElementById('v-swidth').innerText = settings.strokeWidth; };
@@ -304,7 +308,7 @@ document.getElementById('record-btn').onclick = () => {
             const blob = new Blob(recordedChunks, { type });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = `chaos_graph_${Date.now()}.${type.includes('mp4')?'mp4':'webm'}`;
+            a.download = `chaos_growth_${Date.now()}.${type.includes('mp4')?'mp4':'webm'}`;
             a.click();
         };
         mediaRecorder.start();
