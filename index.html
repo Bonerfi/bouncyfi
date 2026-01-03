@@ -3,86 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chaos Lab: All-MIDI Fix</title>
+    <title>Chaos Lab: Outline Pro</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/midi-player-js@2.0.16/browser/midiplayer.min.js"></script>
     <style>
         :root { --accent: #00f2ff; --panel-bg: rgba(10, 10, 15, 0.98); }
-        body { margin: 0; background: #000; color: #eee; font-family: 'Inter', sans-serif; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw; }
-        canvas { max-width: 100%; max-height: 100%; object-fit: contain; background: #000; }
-        #audio-unlock { position: absolute; inset: 0; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 200; cursor: pointer; text-align: center; }
-        #audio-unlock h2 { color: var(--accent); margin-bottom: 10px; }
-        #panel { position: absolute; top: 10px; left: 10px; width: 240px; background: var(--panel-bg); padding: 15px; border-radius: 12px; border: 1px solid #333; backdrop-filter: blur(15px); max-height: 80vh; overflow-y: auto; z-index: 100; font-size: 12px; -webkit-overflow-scrolling: touch; }
-        #toggle-ui { position: absolute; bottom: 20px; right: 20px; width: 50px; height: 50px; border-radius: 25px; background: var(--accent); border: none; font-weight: bold; z-index: 101; cursor: pointer; opacity: 0.7; }
-        h3 { margin: 12px 0 8px 0; color: var(--accent); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; border-bottom: 1px solid #222; padding-bottom: 4px; }
-        .section { margin-bottom: 12px; }
-        label { display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 4px; color: #888; }
-        span { color: var(--accent); font-family: monospace; }
-        input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
-        input[type="color"] { width: 100%; height: 25px; background: #1a1a1a; border: 1px solid #333; cursor: pointer; }
-        #palette-list { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
-        .color-item { position: relative; width: 30px; height: 30px; border-radius: 4px; border: 1px solid #444; overflow: hidden; }
-        .color-item input { position: absolute; top: -5px; left: -5px; width: 45px; height: 45px; }
+        body { margin: 0; background: #000; color: #eee; font-family: 'Inter', sans-serif; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        canvas { max-width: 100%; max-height: 100%; object-fit: contain; }
+        #audio-unlock { position: absolute; inset: 0; background: rgba(0,0,0,0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 200; cursor: pointer; }
+        #panel { position: absolute; top: 10px; left: 10px; width: 230px; background: var(--panel-bg); padding: 15px; border-radius: 12px; border: 1px solid #333; z-index: 100; font-size: 11px; max-height: 85vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
         .btn { background: var(--accent); color: #000; border: none; padding: 10px; width: 100%; border-radius: 4px; font-weight: bold; cursor: pointer; margin-top: 5px; }
-        .btn-rec { background: #ff4444; color: white; }
+        .btn-rec { background: #ff4444; color: #fff; }
+        h4 { margin: 15px 0 5px 0; color: var(--accent); text-transform: uppercase; font-size: 10px; border-bottom: 1px solid #333; }
+        label { display: flex; justify-content: space-between; margin-top: 8px; color: #888; }
+        input[type="range"] { width: 100%; accent-color: var(--accent); }
+        input[type="color"] { width: 100%; height: 25px; border: none; background: #222; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div id="audio-unlock" onclick="unlockAudio()">
-    <h2>🔊 Tap to Start</h2>
-    <p>Ensures Sound & All MIDI files work</p>
+    <h2 style="color:var(--accent)">ACTIVATE RENDERER</h2>
+    <p>Tap to start Physics & Ball Stylizer</p>
 </div>
 
-<button id="toggle-ui" onclick="document.getElementById('panel').style.display = document.getElementById('panel').style.display === 'none' ? 'block' : 'none'">UI</button>
-
 <div id="panel">
-    <h3>iOS Pro Renderer</h3>
-    <button id="record-btn" class="btn btn-rec">START RECORDING</button>
+    <button id="record-btn" class="btn btn-rec">RENDER VIDEO + AUDIO</button>
     
-    <button class="btn" style="background: #333; color: white; margin-top: 10px;" onclick="document.getElementById('midi-upload').click()">LOAD MIDI FILE</button>
-    <div id="midi-status" style="font-size: 9px; color: #00ff00; text-align: center; margin-top: 4px;">No MIDI Loaded</div>
+    <button class="btn" style="background: #333; color: white; margin-top: 10px;" onclick="document.getElementById('midi-upload').click()">LOAD MIDI</button>
     <input type="file" id="midi-upload" accept=".mid,.midi" style="display:none">
 
-    <h3>Environment</h3>
-    <div class="section">
-        <label>Background</label>
-        <input type="color" id="bg-color" value="#050505">
-        <label style="margin-top:8px;">Arena Ring</label>
-        <input type="color" id="arena-color" value="#333333">
-    </div>
+    <h4>Ball Style</h4>
+    <label>Fill Color</label>
+    <input type="color" id="ball-fill" value="#00f2ff">
+    
+    <label>Outline Color</label>
+    <input type="color" id="ball-stroke" value="#ffffff">
+    
+    <label>Outline Width <span id="v-swidth">3</span></label>
+    <input type="range" id="stroke-width" min="0" max="20" step="1" value="3">
 
-    <h3>Ball Chroma</h3>
-    <div class="section">
-        <div id="palette-list"></div>
-        <button class="btn" style="font-size: 9px; padding: 4px;" onclick="addColor()">+ Add Color</button>
-        <label style="margin-top:8px;">Cycle Speed <span id="v-cycle">0.005</span></label>
-        <input type="range" id="cycle-speed" min="0" max="0.05" step="0.001" value="0.005">
-    </div>
+    <label>Glow Power <span id="v-glow">30</span></label>
+    <input type="range" id="glow-power" min="0" max="100" step="1" value="30">
 
-    <h3>Physics</h3>
-    <div class="section">
-        <label>Gravity <span id="v-grav">0.30</span></label>
-        <input type="range" id="grav" min="0" max="1" step="0.01" value="0.30">
-        <label>Bounciness <span id="v-bounce">0.98</span></label>
-        <input type="range" id="bounce" min="0.5" max="1.1" step="0.01" value="0.98">
-    </div>
+    <h4>Physics</h4>
+    <label>Gravity <span id="v-grav">0.30</span></label>
+    <input type="range" id="grav" min="0" max="1" step="0.01" value="0.30">
+    
+    <label>Bounciness <span id="v-bounce">0.98</span></label>
+    <input type="range" id="bounce" min="0.5" max="1.1" step="0.01" value="0.98">
 
-    <h3>Infinite Trail</h3>
-    <div class="section">
-        <label>Persistence <span id="v-persist">0.10</span></label>
-        <input type="range" id="trail-persist" min="0" max="1" step="0.001" value="0.10">
-    </div>
+    <label>Trail Persistence</label>
+    <input type="range" id="trail-persist" min="0" max="1" step="0.001" value="0.10">
 
-    <h3>Escalation</h3>
-    <div class="section">
-        <label>Speed Mult <span id="v-speed">x1.000</span></label>
-        <input type="range" id="speed-mult" min="0.95" max="1.05" step="0.001" value="1.000">
-        <label>Size Inc <span id="v-grow">+0.00</span></label>
-        <input type="range" id="grow-amt" min="-1" max="2" step="0.01" value="0.00">
-    </div>
-
-    <button class="btn" onclick="resetSim()">RESET EVERYTHING</button>
+    <button class="btn" onclick="resetSim()" style="margin-top:15px">RESET</button>
 </div>
 
 <canvas id="canvas"></canvas>
@@ -90,75 +64,37 @@
 <script>
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-const REC_WIDTH = 1080;
-const REC_HEIGHT = 1920;
-canvas.width = REC_WIDTH;
-canvas.height = REC_HEIGHT;
-const centerX = REC_WIDTH / 2;
-const centerY = REC_HEIGHT / 2;
-const arenaRadius = REC_WIDTH * 0.44;
+canvas.width = 1080; canvas.height = 1920;
+const centerX = 540, centerY = 960, arenaRadius = 475;
 
-let midiNotes = [];
-let noteIndex = 0;
-let colorTimer = 0;
-let synth;
+let midiNotes = [], noteIndex = 0, synth, audioDest;
+const settings = { 
+    persistence: 0.1, 
+    gravity: 0.3, 
+    bounce: 0.98,
+    ballFill: '#00f2ff',
+    ballStroke: '#ffffff',
+    strokeWidth: 3,
+    glowPower: 30
+};
+const ball = { x: centerX, y: centerY, vx: 10, vy: 5, radius: 30, glow: 0 };
 
 async function unlockAudio() {
     await Tone.start();
-    // High-quality synth settings
-    synth = new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: "triangle" },
-        envelope: { attack: 0.005, decay: 0.1, sustain: 0.2, release: 1 }
-    }).toDestination();
+    audioDest = Tone.getContext().createMediaStreamDestination();
+    synth = new Tone.PolySynth(Tone.Synth).connect(audioDest).toDestination();
     document.getElementById('audio-unlock').style.display = 'none';
-    resetSim();
-    loop();
-}
-
-const settings = {
-    bgColor: '#050505',
-    arenaColor: '#333333',
-    palette: ['#00f2ff', '#ff00ff', '#ffff00'],
-    cycleSpeed: 0.005,
-    persistence: 0.1,
-    sizeInc: 0,
-    speedMult: 1.0,
-    gravity: 0.3,
-    bounce: 0.98
-};
-
-const ball = { x: centerX, y: centerY, vx: 10, vy: 5, radius: 30, baseRadius: 30, glow: 0, currentColor: '#00f2ff' };
-
-function hexToRgba(hex, alpha) {
-    const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-function lerpColor(c1, c2, t) {
-    const r1 = parseInt(c1.substr(1,2), 16), g1 = parseInt(c1.substr(3,2), 16), b1 = parseInt(c1.substr(5,2), 16);
-    const r2 = parseInt(c2.substr(1,2), 16), g2 = parseInt(c2.substr(3,2), 16), b2 = parseInt(c2.substr(5,2), 16);
-    return `rgb(${Math.round(r1+(r2-r1)*t)}, ${Math.round(g1+(g2-g1)*t)}, ${Math.round(b1+(b2-b1)*t)})`;
+    resetSim(); loop();
 }
 
 function resetSim() {
-    ball.x = centerX; ball.y = centerY;
-    ball.vx = 10; ball.vy = 5;
-    ball.radius = ball.baseRadius;
-    ctx.fillStyle = settings.bgColor;
-    ctx.fillRect(0, 0, REC_WIDTH, REC_HEIGHT);
+    ball.x = centerX; ball.y = centerY; ball.vx = 10; ball.vy = 5;
+    ctx.fillStyle = '#050505'; ctx.fillRect(0, 0, 1080, 1920);
 }
 
 function update() {
     ball.vy += settings.gravity;
     ball.x += ball.vx; ball.y += ball.vy;
-
-    if (settings.palette.length > 1) {
-        colorTimer += settings.cycleSpeed;
-        const t = colorTimer % settings.palette.length;
-        const i = Math.floor(t), next = (i + 1) % settings.palette.length;
-        ball.currentColor = lerpColor(settings.palette[i], settings.palette[next], t - i);
-    }
-
     const dx = ball.x - centerX, dy = ball.y - centerY;
     const dist = Math.sqrt(dx*dx + dy*dy);
 
@@ -169,8 +105,6 @@ function update() {
         ball.vy = (ball.vy - 2 * dot * ny) * settings.bounce;
         ball.x = centerX + nx * (arenaRadius - ball.radius);
         ball.y = centerY + ny * (arenaRadius - ball.radius);
-        ball.radius = Math.max(5, ball.radius + settings.sizeInc);
-        ball.vx *= settings.speedMult; ball.vy *= settings.speedMult;
 
         if (midiNotes.length > 0 && synth) {
             synth.triggerAttackRelease(midiNotes[noteIndex], "8n");
@@ -182,32 +116,38 @@ function update() {
 }
 
 function draw() {
-    if (settings.persistence > 0) {
-        ctx.fillStyle = hexToRgba(settings.bgColor, settings.persistence);
-        ctx.fillRect(0, 0, REC_WIDTH, REC_HEIGHT);
-    }
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, arenaRadius, 0, Math.PI*2);
-    ctx.strokeStyle = settings.arenaColor;
-    ctx.lineWidth = 15;
-    ctx.stroke();
+    ctx.fillStyle = `rgba(5, 5, 5, ${settings.persistence})`;
+    ctx.fillRect(0, 0, 1080, 1920);
 
+    // Arena
+    ctx.beginPath(); ctx.arc(centerX, centerY, arenaRadius, 0, Math.PI*2);
+    ctx.strokeStyle = '#333'; ctx.lineWidth = 15; ctx.stroke();
+
+    // Ball Render
     ctx.save();
-    ctx.shadowBlur = ball.glow * 60;
-    ctx.shadowColor = ball.currentColor;
+    ctx.shadowBlur = ball.glow * settings.glowPower;
+    ctx.shadowColor = settings.ballStroke;
+    
     ctx.beginPath();
     ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI*2);
-    ctx.fillStyle = ball.currentColor;
+    
+    // Fill
+    ctx.fillStyle = settings.ballFill;
     ctx.fill();
+    
+    // Outline (The New Custom Part)
+    if (settings.strokeWidth > 0) {
+        ctx.strokeStyle = settings.ballStroke;
+        ctx.lineWidth = settings.strokeWidth;
+        ctx.stroke();
+    }
+    
     ctx.restore();
 }
 
-function loop() {
-    update(); draw();
-    requestAnimationFrame(loop);
-}
+function loop() { update(); draw(); requestAnimationFrame(loop); }
 
-// Media Management
+// Renderer logic
 let mediaRecorder;
 let recordedChunks = [];
 const recordBtn = document.getElementById('record-btn');
@@ -215,81 +155,52 @@ const recordBtn = document.getElementById('record-btn');
 recordBtn.onclick = () => {
     if (mediaRecorder && mediaRecorder.state === "recording") {
         mediaRecorder.stop();
-        recordBtn.innerText = "START RECORDING";
+        recordBtn.innerText = "RENDER VIDEO + AUDIO";
     } else {
         recordedChunks = [];
-        const stream = canvas.captureStream(60);
+        const combinedStream = new MediaStream([
+            ...canvas.captureStream(60).getVideoTracks(),
+            ...audioDest.stream.getAudioTracks()
+        ]);
         const mimeType = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
-        mediaRecorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8000000 });
+        mediaRecorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: 8000000 });
         mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
         mediaRecorder.onstop = () => {
             const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
             const blob = new Blob(recordedChunks, { type: mimeType });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = `chaos_${Date.now()}.${ext}`;
+            a.download = `chaos_custom_${Date.now()}.${ext}`;
             a.click();
         };
         mediaRecorder.start();
-        recordBtn.innerText = "STOP RECORDING";
+        recordBtn.innerText = "STOP & COMPILE";
     }
 };
 
-// FIX: ALL-TRACK MIDI LOADER
-document.getElementById('midi-upload').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+// UI Listeners
+document.getElementById('midi-upload').onchange = (e) => {
     const reader = new FileReader();
     reader.onload = (ev) => {
         const p = new MidiPlayer.Player();
         p.loadArrayBuffer(ev.target.result);
-        
-        // Extract notes from ALL tracks, not just index 0
-        const allTracks = p.getEvents();
-        let extractedNotes = [];
-        
-        allTracks.forEach(track => {
-            const notes = track
-                .filter(event => event.name === 'Note on' && event.velocity > 0)
-                .map(event => event.noteName);
-            extractedNotes = extractedNotes.concat(notes);
+        let notes = [];
+        p.getEvents().forEach(t => {
+            t.filter(ev => ev.name === 'Note on' && ev.velocity > 0).forEach(ev => notes.push(ev.noteName));
         });
-
-        if (extractedNotes.length > 0) {
-            midiNotes = extractedNotes;
-            noteIndex = 0;
-            document.getElementById('midi-status').innerText = `Loaded: ${extractedNotes.length} notes`;
-            document.getElementById('midi-status').style.color = "#00ff00";
-        } else {
-            document.getElementById('midi-status').innerText = "Error: No notes found in file";
-            document.getElementById('midi-status').style.color = "#ff4444";
-        }
+        midiNotes = notes;
     };
-    reader.readAsArrayBuffer(file);
-});
+    reader.readAsArrayBuffer(e.target.files[0]);
+};
 
-function renderPalette() {
-    const list = document.getElementById('palette-list');
-    list.innerHTML = '';
-    settings.palette.forEach((c, i) => {
-        const div = document.createElement('div');
-        div.className = 'color-item';
-        div.innerHTML = `<input type="color" value="${c}" oninput="settings.palette[${i}]=this.value"><button style="position:absolute;top:0;right:0;background:none;border:none;color:white;cursor:pointer;font-size:10px;" onclick="settings.palette.splice(${i},1);renderPalette()">×</button>`;
-        list.appendChild(div);
-    });
-}
-function addColor() { settings.palette.push('#ffffff'); renderPalette(); }
+document.getElementById('ball-fill').oninput = (e) => settings.ballFill = e.target.value;
+document.getElementById('ball-stroke').oninput = (e) => settings.ballStroke = e.target.value;
+document.getElementById('stroke-width').oninput = (e) => { settings.strokeWidth = parseInt(e.target.value); document.getElementById('v-swidth').innerText = settings.strokeWidth; };
+document.getElementById('glow-power').oninput = (e) => { settings.glowPower = parseInt(e.target.value); document.getElementById('v-glow').innerText = settings.glowPower; };
+document.getElementById('grav').oninput = (e) => { settings.gravity = parseFloat(e.target.value); document.getElementById('v-grav').innerText = settings.gravity; };
+document.getElementById('bounce').oninput = (e) => { settings.bounce = parseFloat(e.target.value); document.getElementById('v-bounce').innerText = settings.bounce; };
+document.getElementById('trail-persist').oninput = (e) => settings.persistence = parseFloat(e.target.value);
 
-document.getElementById('bg-color').oninput = (e) => settings.bgColor = e.target.value;
-document.getElementById('arena-color').oninput = (e) => settings.arenaColor = e.target.value;
-document.getElementById('grav').oninput = (e) => { settings.gravity = parseFloat(e.target.value); document.getElementById('v-grav').innerText = settings.gravity.toFixed(2); };
-document.getElementById('bounce').oninput = (e) => { settings.bounce = parseFloat(e.target.value); document.getElementById('v-bounce').innerText = settings.bounce.toFixed(2); };
-document.getElementById('cycle-speed').oninput = (e) => { settings.cycleSpeed = parseFloat(e.target.value); document.getElementById('v-cycle').innerText = settings.cycleSpeed.toFixed(3); };
-document.getElementById('trail-persist').oninput = (e) => { settings.persistence = parseFloat(e.target.value); document.getElementById('v-persist').innerText = settings.persistence.toFixed(2); };
-document.getElementById('grow-amt').oninput = (e) => { settings.sizeInc = parseFloat(e.target.value); document.getElementById('v-grow').innerText = (settings.sizeInc >= 0 ? '+' : '') + settings.sizeInc.toFixed(2); };
-document.getElementById('speed-mult').oninput = (e) => { settings.speedMult = parseFloat(e.target.value); document.getElementById('v-speed').innerText = 'x' + settings.speedMult.toFixed(3); };
-
-renderPalette();
 </script>
 </body>
 </html>
