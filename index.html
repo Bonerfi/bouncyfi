@@ -3,25 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chaos Lab: Collision Tracker</title>
+    <title>Chaos Lab: Visibility Fix</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/midi-player-js@2.0.16/browser/midiplayer.min.js"></script>
     <style>
-        :root { --accent: #00f2ff; --panel-bg: rgba(10, 10, 15, 0.98); }
+        :root { --accent: #00f2ff; --panel-bg: rgba(15, 15, 20, 0.95); }
         body { margin: 0; background: #000; color: #eee; font-family: 'Inter', sans-serif; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw; }
-        canvas { max-width: 100%; max-height: 100%; object-fit: contain; background: #000; }
+        canvas { max-width: 100%; max-height: 100%; object-fit: contain; background: #000; border: 1px solid #222; }
         
-        #audio-unlock { position: absolute; inset: 0; background: rgba(0,0,0,0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 200; cursor: pointer; text-align: center; }
-        #panel { position: absolute; top: 10px; left: 10px; width: 240px; background: var(--panel-bg); padding: 15px; border-radius: 12px; border: 1px solid #333; backdrop-filter: blur(15px); max-height: 85vh; overflow-y: auto; z-index: 100; font-size: 11px; -webkit-overflow-scrolling: touch; }
-        #toggle-ui { position: absolute; bottom: 20px; right: 20px; width: 50px; height: 50px; border-radius: 25px; background: var(--accent); border: none; font-weight: bold; z-index: 101; cursor: pointer; opacity: 0.7; color: #000; }
+        #audio-unlock { position: absolute; inset: 0; background: rgba(0,0,0,0.98); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 200; cursor: pointer; text-align: center; }
+        #panel { position: absolute; top: 10px; left: 10px; width: 240px; background: var(--panel-bg); padding: 15px; border-radius: 12px; border: 1px solid #333; backdrop-filter: blur(10px); max-height: 85vh; overflow-y: auto; z-index: 100; font-size: 11px; }
+        #toggle-ui { position: absolute; bottom: 20px; right: 20px; width: 50px; height: 50px; border-radius: 25px; background: var(--accent); border: none; font-weight: bold; z-index: 101; cursor: pointer; color: #000; box-shadow: 0 0 15px var(--accent); }
         
-        h4 { margin: 12px 0 5px 0; color: var(--accent); text-transform: uppercase; font-size: 9px; letter-spacing: 1px; border-bottom: 1px solid #222; padding-bottom: 2px; }
+        h4 { margin: 12px 0 5px 0; color: var(--accent); text-transform: uppercase; font-size: 9px; letter-spacing: 1px; border-bottom: 1px solid #333; padding-bottom: 2px; }
         .section { margin-bottom: 10px; }
-        label { display: flex; justify-content: space-between; margin-bottom: 4px; color: #888; }
+        label { display: flex; justify-content: space-between; margin-bottom: 4px; color: #aaa; }
         span { color: var(--accent); font-family: monospace; }
         
         input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
-        input[type="color"] { width: 100%; height: 25px; background: #1a1a1a; border: 1px solid #333; cursor: pointer; }
+        input[type="color"] { width: 100%; height: 25px; background: #1a1a1a; border: 1px solid #333; cursor: pointer; border-radius: 4px; }
         #palette-list { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 5px; }
         .color-item { position: relative; width: 28px; height: 28px; border-radius: 4px; border: 1px solid #444; overflow: hidden; }
         .color-item input { position: absolute; top: -5px; left: -5px; width: 40px; height: 40px; }
@@ -33,51 +33,48 @@
 <body>
 
 <div id="audio-unlock" onclick="unlockAudio()">
-    <h2 style="color:var(--accent)">INITIALIZE SYSTEM</h2>
-    <p>Tap to start Sequencer + Growth Graph</p>
+    <h1 style="color:var(--accent); margin-bottom:10px;">ENGINE READY</h1>
+    <p>Tap to start Sequencer & Visuals</p>
 </div>
 
 <button id="toggle-ui" onclick="toggleUI()">UI</button>
 
 <div id="panel">
-    <button id="record-btn" class="btn btn-rec">RENDER PRO VIDEO</button>
-    <button class="btn" style="background: #333; color: white; margin-top: 8px;" onclick="document.getElementById('midi-upload').click()">LOAD MIDI FILE</button>
-    <div id="midi-status" style="font-size: 8px; color: #00ff00; text-align: center; margin-top: 3px;">No MIDI</div>
+    <button id="record-btn" class="btn btn-rec">RENDER VIDEO</button>
+    <button class="btn" style="background: #333; color: white; margin-top: 8px;" onclick="document.getElementById('midi-upload').click()">LOAD MIDI</button>
+    <div id="midi-status" style="font-size: 8px; color: #00ff00; text-align: center; margin-top: 3px;">No MIDI Loaded</div>
     <input type="file" id="midi-upload" accept=".mid,.midi" style="display:none">
 
     <h4>Collision Graph</h4>
     <div class="section">
-        <label>Show Growth Graph</label>
-        <input type="checkbox" id="show-graph" checked>
-        <label>Graph Opacity <span id="v-gopac">0.5</span></label>
-        <input type="range" id="graph-opac" min="0" max="1" step="0.1" value="0.5">
-        <div style="font-size: 9px; color: var(--accent); margin-top: 5px;">Total Hits: <span id="hit-count">0</span></div>
+        <label>Total Hits: <span id="hit-count">0</span></label>
+        <label>Show Graph <input type="checkbox" id="show-graph" checked></label>
+        <label>Graph Opacity <span id="v-gopac">0.6</span></label>
+        <input type="range" id="graph-opac" min="0" max="1" step="0.1" value="0.6">
     </div>
 
-    <h4>Ball & Outline</h4>
+    <h4>Ball Styling</h4>
     <div class="section">
         <label>Outline Color</label>
         <input type="color" id="ball-stroke" value="#ffffff">
-        <label style="margin-top:5px;">Outline Thickness <span id="v-swidth">3</span></label>
-        <input type="range" id="stroke-width" min="0" max="25" step="1" value="3">
-        <label>Glow Strength <span id="v-glow">40</span></label>
-        <input type="range" id="glow-power" min="0" max="100" step="1" value="40">
+        <label>Outline Width <span id="v-swidth">3</span></label>
+        <input type="range" id="stroke-width" min="0" max="25" value="3">
+        <label>Glow Power <span id="v-glow">40</span></label>
+        <input type="range" id="glow-power" min="0" max="100" value="40">
     </div>
 
     <h4>Color Spectrum</h4>
     <div class="section">
         <div id="palette-list"></div>
-        <button class="btn" style="font-size: 9px; padding: 3px;" onclick="addColor()">+ Color</button>
-        <label style="margin-top:8px;">Cycle Speed <span id="v-cycle">0.005</span></label>
+        <button class="btn" style="font-size: 9px; padding: 3px;" onclick="addColor()">+ Add Color</button>
+        <label>Cycle Speed <span id="v-cycle">0.005</span></label>
         <input type="range" id="cycle-speed" min="0" max="0.05" step="0.001" value="0.005">
     </div>
 
-    <h4>Physics & Escalation</h4>
+    <h4>Physics</h4>
     <div class="section">
         <label>Gravity <span id="v-grav">0.30</span></label>
         <input type="range" id="grav" min="0" max="1" step="0.01" value="0.30">
-        <label>Bounciness <span id="v-bounce">0.98</span></label>
-        <input type="range" id="bounce" min="0.5" max="1.1" step="0.01" value="0.98">
         <label>Speed Mult <span id="v-speed">x1.000</span></label>
         <input type="range" id="speed-mult" min="0.95" max="1.05" step="0.001" value="1.000">
         <label>Size Inc <span id="v-grow">+0.00</span></label>
@@ -87,12 +84,12 @@
     <h4>Environment</h4>
     <div class="section">
         <label>Trail Persistence <span id="v-persist">0.10</span></label>
-        <input type="range" id="trail-persist" min="0" max="1" step="0.001" value="0.10">
+        <input type="range" id="trail-persist" min="0.01" max="1" step="0.01" value="0.10">
         <label>Background</label>
         <input type="color" id="bg-color" value="#050505">
     </div>
 
-    <button class="btn" onclick="resetSim()" style="margin-top:10px">RESET EVERYTHING</button>
+    <button class="btn" onclick="resetSim()" style="margin-top:10px; background:#444; color:white;">RESET SIM</button>
 </div>
 
 <canvas id="canvas"></canvas>
@@ -105,7 +102,7 @@ const centerX = 540, centerY = 960, arenaRadius = 475;
 
 let midiNotes = [], noteIndex = 0, colorTimer = 0, synth, audioDest;
 let totalCollisions = 0;
-let collisionHistory = new Array(200).fill(0); // For the rolling growth graph
+let collisionHistory = new Array(200).fill(0);
 
 const settings = {
     bgColor: '#050505',
@@ -120,10 +117,10 @@ const settings = {
     strokeWidth: 3,
     glowPower: 40,
     showGraph: true,
-    graphOpac: 0.5
+    graphOpac: 0.6
 };
 
-const ball = { x: centerX, y: centerY, vx: 10, vy: 5, radius: 30, baseRadius: 30, glow: 0, currentColor: '#00f2ff' };
+const ball = { x: centerX, y: centerY, vx: 10, vy: 5, radius: 30, glow: 0, currentColor: '#00f2ff' };
 
 async function unlockAudio() {
     await Tone.start();
@@ -133,45 +130,43 @@ async function unlockAudio() {
         envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 0.5 }
     }).connect(audioDest).toDestination();
     document.getElementById('audio-unlock').style.display = 'none';
-    resetSim(); loop();
-}
-
-function toggleUI() {
-    const p = document.getElementById('panel');
-    p.style.display = p.style.display === 'none' ? 'block' : 'none';
+    resetSim(); 
+    requestAnimationFrame(loop);
 }
 
 function resetSim() {
     ball.x = centerX; ball.y = centerY; ball.vx = 10; ball.vy = 5;
-    ball.radius = ball.baseRadius; noteIndex = 0;
-    totalCollisions = 0;
+    ball.radius = 30; noteIndex = 0; totalCollisions = 0;
     collisionHistory.fill(0);
     document.getElementById('hit-count').innerText = "0";
     ctx.fillStyle = settings.bgColor;
     ctx.fillRect(0, 0, 1080, 1920);
 }
 
-function lerpColor(c1, c2, t) {
-    const r1 = parseInt(c1.substr(1,2),16), g1 = parseInt(c1.substr(3,2),16), b1 = parseInt(c1.substr(5,2),16);
-    const r2 = parseInt(c2.substr(1,2),16), g2 = parseInt(c2.substr(3,2),16), b2 = parseInt(c2.substr(5,2),16);
-    return `rgb(${Math.round(r1+(r2-r1)*t)}, ${Math.round(g1+(g2-g1)*t)}, ${Math.round(b1+(b2-b1)*t)})`;
+function hexToRgb(hex) {
+    const r = parseInt(hex.slice(1,3), 16), g = parseInt(hex.slice(3,5), 16), b = parseInt(hex.slice(5,7), 16);
+    return {r, g, b};
 }
 
-function update() {
+function loop() {
+    // 1. Update Physics
     ball.vy += settings.gravity;
     ball.x += ball.vx; ball.y += ball.vy;
 
+    // 2. Color Cycling
     if (settings.palette.length > 1) {
         colorTimer += settings.cycleSpeed;
         const t = colorTimer % settings.palette.length;
         const i = Math.floor(t), next = (i + 1) % settings.palette.length;
-        ball.currentColor = lerpColor(settings.palette[i], settings.palette[next], t - i);
+        const c1 = hexToRgb(settings.palette[i]), c2 = hexToRgb(settings.palette[next]);
+        const f = t - i;
+        ball.currentColor = `rgb(${Math.round(c1.r+(c2.r-c1.r)*f)},${Math.round(c1.g+(c2.g-c1.g)*f)},${Math.round(c1.b+(c2.b-c1.b)*f)})`;
     }
 
+    // 3. Collision Logic
     const dx = ball.x - centerX, dy = ball.y - centerY;
     const dist = Math.sqrt(dx*dx + dy*dy);
-
-    // Update History (Rolling data)
+    
     collisionHistory.push(totalCollisions);
     collisionHistory.shift();
 
@@ -185,8 +180,7 @@ function update() {
 
         ball.radius = Math.max(5, ball.radius + settings.sizeInc);
         ball.vx *= settings.speedMult; ball.vy *= settings.speedMult;
-
-        // COLLISION COUNT GROWTH
+        
         totalCollisions++;
         document.getElementById('hit-count').innerText = totalCollisions;
 
@@ -197,16 +191,17 @@ function update() {
         ball.glow = 1;
     }
     ball.glow *= 0.9;
-}
 
-function draw() {
-    const bg = settings.bgColor;
-    ctx.fillStyle = `rgba(${parseInt(bg.slice(1,3),16)}, ${parseInt(bg.slice(3,5),16)}, ${parseInt(bg.slice(5,7),16)}, ${settings.persistence})`;
+    // 4. Draw Frame
+    const rgb = hexToRgb(settings.bgColor);
+    ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${settings.persistence})`;
     ctx.fillRect(0, 0, 1080, 1920);
 
+    // Arena Ring
     ctx.beginPath(); ctx.arc(centerX, centerY, arenaRadius, 0, Math.PI*2);
     ctx.strokeStyle = '#333'; ctx.lineWidth = 15; ctx.stroke();
 
+    // Ball
     ctx.save();
     ctx.shadowBlur = ball.glow * settings.glowPower; ctx.shadowColor = settings.ballStroke;
     ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI*2);
@@ -218,32 +213,30 @@ function draw() {
     }
     ctx.restore();
 
-    if(settings.showGraph) drawGrowthGraph();
+    if(settings.showGraph) drawGraph();
+    requestAnimationFrame(loop);
 }
 
-function drawGrowthGraph() {
-    const graphWidth = 800;
-    const graphHeight = 200;
-    const xBase = 540 - (graphWidth/2);
-    const yBase = 1800;
-
+function drawGraph() {
+    const w = 800, h = 200, x = 540 - 400, y = 1800;
     ctx.save();
     ctx.globalAlpha = settings.graphOpac;
     ctx.strokeStyle = settings.ballStroke;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 4;
     ctx.beginPath();
-    
-    // Scale graph based on total hits
     const maxVal = Math.max(50, totalCollisions);
-    
-    for(let i=0; i < collisionHistory.length; i++) {
-        const x = xBase + (i * (graphWidth / collisionHistory.length));
-        const y = yBase - (collisionHistory[i] / maxVal * graphHeight);
-        if(i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+    for(let i=0; i<collisionHistory.length; i++) {
+        const px = x + (i * (w / collisionHistory.length));
+        const py = y - (collisionHistory[i] / maxVal * h);
+        if(i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
     }
     ctx.stroke();
     ctx.restore();
+}
+
+function toggleUI() {
+    const p = document.getElementById('panel');
+    p.style.display = p.style.display === 'none' ? 'block' : 'none';
 }
 
 function renderPalette() {
@@ -264,22 +257,17 @@ document.getElementById('midi-upload').onchange = (e) => {
         const p = new MidiPlayer.Player();
         p.loadArrayBuffer(ev.target.result);
         let events = [];
-        p.getEvents().forEach(track => {
-            track.forEach(event => {
-                if (event.name === 'Note on' && event.velocity > 0) {
-                    events.push({ note: event.noteName, tick: event.tick });
-                }
-            });
-        });
-        events.sort((a, b) => a.tick - b.tick);
-        midiNotes = events;
-        noteIndex = 0;
+        p.getEvents().forEach(track => track.forEach(ev => {
+            if(ev.name === 'Note on' && ev.velocity > 0) events.push({note: ev.noteName, tick: ev.tick});
+        }));
+        events.sort((a,b) => a.tick - b.tick);
+        midiNotes = events; noteIndex = 0;
         document.getElementById('midi-status').innerText = `Loaded ${events.length} notes`;
     };
     reader.readAsArrayBuffer(e.target.files[0]);
 };
 
-// UI Listeners
+// Listeners
 document.getElementById('show-graph').onchange = (e) => settings.showGraph = e.target.checked;
 document.getElementById('graph-opac').oninput = (e) => { settings.graphOpac = parseFloat(e.target.value); document.getElementById('v-gopac').innerText = settings.graphOpac; };
 document.getElementById('ball-stroke').oninput = (e) => settings.ballStroke = e.target.value;
@@ -287,9 +275,8 @@ document.getElementById('stroke-width').oninput = (e) => { settings.strokeWidth 
 document.getElementById('glow-power').oninput = (e) => { settings.glowPower = parseInt(e.target.value); document.getElementById('v-glow').innerText = settings.glowPower; };
 document.getElementById('cycle-speed').oninput = (e) => { settings.cycleSpeed = parseFloat(e.target.value); document.getElementById('v-cycle').innerText = settings.cycleSpeed.toFixed(3); };
 document.getElementById('grav').oninput = (e) => { settings.gravity = parseFloat(e.target.value); document.getElementById('v-grav').innerText = settings.gravity.toFixed(2); };
-document.getElementById('bounce').oninput = (e) => { settings.bounce = parseFloat(e.target.value); document.getElementById('v-bounce').innerText = settings.bounce.toFixed(2); };
-document.getElementById('speed-mult').oninput = (e) => { settings.speedMult = parseFloat(e.target.value); document.getElementById('v-speed').innerText = 'x' + settings.speedMult.toFixed(3); };
-document.getElementById('grow-amt').oninput = (e) => { settings.sizeInc = parseFloat(e.target.value); document.getElementById('v-grow').innerText = (settings.sizeInc >= 0 ? '+' : '') + settings.sizeInc.toFixed(2); };
+document.getElementById('speed-mult').oninput = (e) => { settings.speedMult = parseFloat(e.target.value); document.getElementById('v-speed').innerText = 'x'+settings.speedMult.toFixed(3); };
+document.getElementById('grow-amt').oninput = (e) => { settings.sizeInc = parseFloat(e.target.value); document.getElementById('v-grow').innerText = (settings.sizeInc>=0?'+':'')+settings.sizeInc.toFixed(2); };
 document.getElementById('trail-persist').oninput = (e) => { settings.persistence = parseFloat(e.target.value); document.getElementById('v-persist').innerText = settings.persistence.toFixed(2); };
 document.getElementById('bg-color').oninput = (e) => settings.bgColor = e.target.value;
 
@@ -297,19 +284,17 @@ let mediaRecorder, recordedChunks = [];
 document.getElementById('record-btn').onclick = () => {
     if (mediaRecorder && mediaRecorder.state === "recording") {
         mediaRecorder.stop();
-        document.getElementById('record-btn').innerText = "RENDER PRO VIDEO";
+        document.getElementById('record-btn').innerText = "RENDER VIDEO";
     } else {
         recordedChunks = [];
-        const combined = new MediaStream([...canvas.captureStream(60).getTracks(), ...audioDest.stream.getTracks()]);
+        const stream = new MediaStream([...canvas.captureStream(60).getTracks(), ...audioDest.stream.getTracks()]);
         const type = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
-        mediaRecorder = new MediaRecorder(combined, { mimeType: type, videoBitsPerSecond: 8000000 });
+        mediaRecorder = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 8000000 });
         mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
         mediaRecorder.onstop = () => {
             const blob = new Blob(recordedChunks, { type });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `chaos_growth_${Date.now()}.${type.includes('mp4')?'mp4':'webm'}`;
-            a.click();
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+            a.download = `chaos_final.${type.includes('mp4')?'mp4':'webm'}`; a.click();
         };
         mediaRecorder.start();
         document.getElementById('record-btn').innerText = "STOP & SAVE";
