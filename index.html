@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chaos Lab: Manual Start</title>
+    <title>Chaos Lab: Custom Start</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/midi-player-js@2.0.16/browser/midiplayer.min.js"></script>
     <style>
@@ -34,7 +34,7 @@
 
 <div id="audio-unlock" onclick="unlockAudio()">
     <h2 style="color:var(--accent)">INITIALIZE</h2>
-    <p>Tap to start engine, then Load MIDI</p>
+    <p>Tap to start engine</p>
 </div>
 
 <button id="toggle-ui" onclick="toggleUI()">UI</button>
@@ -65,6 +65,10 @@
 
     <h4>Physics & Escalation</h4>
     <div class="section">
+        <label>Default Size <span id="v-defsize">30</span></label>
+        <input type="range" id="def-size" min="5" max="100" step="1" value="30">
+        <label>Initial Speed <span id="v-defspeed">10</span></label>
+        <input type="range" id="def-speed" min="1" max="50" step="1" value="10">
         <label>Gravity <span id="v-grav">0.30</span></label>
         <input type="range" id="grav" min="0" max="1" step="0.01" value="0.30">
         <label>Bounciness <span id="v-bounce">0.98</span></label>
@@ -108,10 +112,12 @@ const settings = {
     sizeInc: 0,
     ballStroke: '#ffffff',
     strokeWidth: 3,
-    glowPower: 40
+    glowPower: 40,
+    defaultSize: 30,
+    initialSpeed: 10
 };
 
-const ball = { x: centerX, y: centerY, vx: 10, vy: 5, radius: 30, baseRadius: 30, glow: 0, currentColor: '#00f2ff' };
+const ball = { x: centerX, y: centerY, vx: 0, vy: 0, radius: 30, glow: 0, currentColor: '#00f2ff' };
 
 async function unlockAudio() {
     await Tone.start();
@@ -124,7 +130,6 @@ async function unlockAudio() {
     resetSim(); loop();
 }
 
-// TAP TO START LOGIC
 canvas.addEventListener('mousedown', (e) => {
     if(!isSimRunning) {
         const rect = canvas.getBoundingClientRect();
@@ -133,13 +138,13 @@ canvas.addEventListener('mousedown', (e) => {
         const tapX = (e.clientX - rect.left) * scaleX;
         const tapY = (e.clientY - rect.top) * scaleY;
 
-        // Check if tap is inside circle
         const dist = Math.sqrt((tapX - centerX)**2 + (tapY - centerY)**2);
-        if(dist < arenaRadius - ball.radius) {
+        if(dist < arenaRadius - settings.defaultSize) {
             ball.x = tapX;
             ball.y = tapY;
-            ball.vx = 10;
-            ball.vy = 5;
+            ball.radius = settings.defaultSize;
+            ball.vx = settings.initialSpeed;
+            ball.vy = settings.initialSpeed * 0.5;
             isSimRunning = true;
         }
     }
@@ -148,7 +153,7 @@ canvas.addEventListener('mousedown', (e) => {
 function resetSim() {
     isSimRunning = false;
     ball.x = centerX; ball.y = centerY; ball.vx = 0; ball.vy = 0;
-    ball.radius = ball.baseRadius; noteIndex = 0;
+    ball.radius = settings.defaultSize; noteIndex = 0;
     ctx.fillStyle = settings.bgColor;
     ctx.fillRect(0, 0, 1080, 1920);
 }
@@ -203,12 +208,7 @@ function draw() {
     ctx.beginPath(); ctx.arc(centerX, centerY, arenaRadius, 0, Math.PI*2);
     ctx.strokeStyle = '#333'; ctx.lineWidth = 15; ctx.stroke();
 
-    if(!isSimRunning) {
-        ctx.fillStyle = "rgba(255,255,255,0.1)";
-        ctx.font = "30px Inter";
-        ctx.textAlign = "center";
-        ctx.fillText("TAP INSIDE CIRCLE TO SPAWN BALL", centerX, centerY);
-    } else {
+    if(isSimRunning) {
         ctx.save();
         ctx.shadowBlur = ball.glow * settings.glowPower; ctx.shadowColor = settings.ballStroke;
         ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI*2);
@@ -262,7 +262,9 @@ function toggleUI() {
     p.style.display = p.style.display === 'none' ? 'block' : 'none';
 }
 
-// Controls
+// Control Listeners
+document.getElementById('def-size').oninput = (e) => { settings.defaultSize = parseInt(e.target.value); document.getElementById('v-defsize').innerText = settings.defaultSize; if(!isSimRunning) ball.radius = settings.defaultSize; };
+document.getElementById('def-speed').oninput = (e) => { settings.initialSpeed = parseInt(e.target.value); document.getElementById('v-defspeed').innerText = settings.initialSpeed; };
 document.getElementById('ball-stroke').oninput = (e) => settings.ballStroke = e.target.value;
 document.getElementById('stroke-width').oninput = (e) => { settings.strokeWidth = parseInt(e.target.value); document.getElementById('v-swidth').innerText = settings.strokeWidth; };
 document.getElementById('glow-power').oninput = (e) => { settings.glowPower = parseInt(e.target.value); document.getElementById('v-glow').innerText = settings.glowPower; };
