@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chaos Lab: Ultimate Edition</title>
+    <title>Chaos Lab: Speed Tracker</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/midi-player-js@2.0.16/browser/midiplayer.min.js"></script>
     <style>
         :root { --accent: #00f2ff; --panel-bg: rgba(10, 10, 15, 0.98); }
         body { margin: 0; background: #000; color: #eee; font-family: 'Inter', sans-serif; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw; }
-        #container { position: relative; width: 1080px; height: 1920px; max-width: 100%; max-height: 100%; display: flex; justify-content: center; align-items: center; pointer-events: auto; }
+        #container { position: relative; width: 1080px; height: 1920px; max-width: 100%; max-height: 100%; display: flex; justify-content: center; align-items: center; }
         canvas { position: absolute; max-width: 100%; max-height: 100%; object-fit: contain; pointer-events: none; }
         
         #audio-unlock { position: absolute; inset: 0; background: rgba(0,0,0,0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 200; cursor: pointer; text-align: center; }
@@ -48,9 +48,9 @@
     <div class="section">
         <label>Arena Color <input type="color" id="arena-color" value="#333333"></label>
         <label>Sync with Ball <input type="checkbox" id="sync-arena" checked></label>
-        <label>Arena Size Inc <span id="v-arenagrow">0</span></label>
+        <label>Arena Growth/Hit <span id="v-arenagrow">0</span></label>
         <input type="range" id="arena-grow" min="-10" max="10" step="0.5" value="0">
-        <label>Pulse Growth <span id="v-pulse">60</span></label>
+        <label>Shockwave Power <span id="v-pulse">60</span></label>
         <input type="range" id="pulse-strength" min="0" max="150" step="1" value="60">
     </div>
 
@@ -59,19 +59,11 @@
         <label>Outline Color <input type="color" id="ball-stroke" value="#ffffff"></label>
         <label>Thickness <span id="v-swidth">3</span></label>
         <input type="range" id="stroke-width" min="0" max="25" step="1" value="3">
-        <label>Glow <span id="v-glow">40</span></label>
+        <label>Glow Power <span id="v-glow">40</span></label>
         <input type="range" id="glow-power" min="0" max="100" step="1" value="40">
     </div>
 
-    <h4>Color Palette</h4>
-    <div class="section">
-        <div id="palette-list"></div>
-        <button class="btn" style="font-size: 9px; padding: 3px;" onclick="addColor()">+ Color</button>
-        <label>Speed <span id="v-cycle">0.005</span></label>
-        <input type="range" id="cycle-speed" min="0" max="0.05" step="0.001" value="0.005">
-    </div>
-
-    <h4>Physics</h4>
+    <h4>Physics & Escalation</h4>
     <div class="section">
         <label>Gravity <span id="v-grav">0.30</span></label>
         <input type="range" id="grav" min="0" max="1" step="0.01" value="0.30">
@@ -79,18 +71,20 @@
         <input type="range" id="bounce" min="0.5" max="1.1" step="0.01" value="0.98">
         <label>Speed Mult <span id="v-speed">x1.000</span></label>
         <input type="range" id="speed-mult" min="0.95" max="1.05" step="0.001" value="1.000">
-        <label>Size Inc <span id="v-grow">+0.00</span></label>
+        <label>Ball Size Inc <span id="v-grow">+0.00</span></label>
         <input type="range" id="grow-amt" min="-2" max="3" step="0.01" value="0.00">
     </div>
 
     <h4>Environment</h4>
     <div class="section">
-        <label>Trail <span id="v-persist">0.10</span></label>
+        <label>Persistence <span id="v-persist">0.10</span></label>
         <input type="range" id="trail-persist" min="0" max="1" step="0.001" value="0.10">
-        <label>BG Color <input type="color" id="bg-color" value="#050505"></label>
+        <label>Color Palette</label>
+        <div id="palette-list"></div>
+        <button class="btn" style="font-size: 9px; padding: 3px;" onclick="addColor()">+ Add Color</button>
     </div>
 
-    <button class="btn" onclick="resetSim()" style="margin-top:10px">RESET EVERYTHING</button>
+    <button class="btn" onclick="resetSim()" style="margin-top:10px">RESET SIMULATION</button>
 </div>
 
 <div id="container">
@@ -112,7 +106,7 @@ const centerX = 540, centerY = 960;
 let currentArenaRadius = 475;
 let midiNotes = [], noteIndex = 0, colorTimer = 0, synth, audioDest;
 let isSimRunning = false, arenaPulse = 0, bounceCount = 0;
-let bounceHistory = new Array(120).fill(0);
+let speedHistory = new Array(150).fill(0); // Holds velocity magnitudes
 
 const settings = {
     bgColor: '#050505',
@@ -147,7 +141,6 @@ async function unlockAudio() {
     resetSim(); loop();
 }
 
-// Fixed Input Detection
 container.addEventListener('mousedown', (e) => {
     if(!isSimRunning) {
         const rect = container.getBoundingClientRect();
@@ -157,6 +150,7 @@ container.addEventListener('mousedown', (e) => {
         ball.y = (e.clientY - rect.top) * scaleY;
         ball.vx = settings.initialSpeed; ball.vy = settings.initialSpeed * 0.5;
         isSimRunning = true;
+        speedHistory.fill(0);
     }
 });
 
@@ -166,7 +160,7 @@ function resetSim() {
     ball.x = centerX; ball.y = centerY; ball.radius = settings.defaultSize;
     tctx.fillStyle = settings.bgColor; tctx.fillRect(0, 0, 1080, 1920);
     mctx.clearRect(0,0,1080,1920);
-    bounceHistory.fill(0);
+    speedHistory.fill(0);
 }
 
 function hexToRgb(hex) {
@@ -185,7 +179,10 @@ function update() {
     ball.vy += settings.gravity;
     ball.x += ball.vx; ball.y += ball.vy;
 
-    bounceHistory.push(0); bounceHistory.shift();
+    // Track Speed for Graph
+    const currentSpeed = Math.sqrt(ball.vx**2 + ball.vy**2);
+    speedHistory.push(currentSpeed);
+    speedHistory.shift();
 
     if (settings.palette.length > 1) {
         colorTimer += settings.cycleSpeed;
@@ -202,6 +199,7 @@ function update() {
         const dot = ball.vx * nx + ball.vy * ny;
         ball.vx = (ball.vx - 2 * dot * nx) * settings.bounce;
         ball.vy = (ball.vy - 2 * dot * ny) * settings.bounce;
+        
         currentArenaRadius = Math.max(100, Math.min(530, currentArenaRadius + settings.arenaGrowAmt));
         ball.x = centerX + nx * (currentArenaRadius - ball.radius);
         ball.y = centerY + ny * (currentArenaRadius - ball.radius);
@@ -213,7 +211,6 @@ function update() {
             noteIndex = (noteIndex + 1) % midiNotes.length;
         }
         ball.glow = 1; arenaPulse = 1; bounceCount++;
-        bounceHistory[bounceHistory.length-1] = 1;
     }
     ball.glow *= 0.9; arenaPulse *= 0.94;
 }
@@ -239,33 +236,52 @@ function draw() {
     mctx.clearRect(0,0,1080,1920);
     const cArena = settings.syncArena ? ball.currentColor : settings.arenaColor;
     
-    // Main Ring
-    mctx.beginPath();
-    mctx.arc(centerX, centerY, currentArenaRadius, 0, Math.PI*2);
+    // Arena Ring
+    mctx.save();
+    mctx.beginPath(); mctx.arc(centerX, centerY, currentArenaRadius, 0, Math.PI*2);
     mctx.strokeStyle = cArena; mctx.lineWidth = 15; mctx.globalAlpha = 0.8;
     mctx.stroke();
 
-    // Pulse
+    // Pulse Effect
     if (arenaPulse > 0.01) {
         mctx.beginPath();
         const pR = currentArenaRadius + ((1 - arenaPulse) * settings.pulseStrength);
         mctx.arc(centerX, centerY, pR, 0, Math.PI*2);
-        mctx.lineWidth = 5 + (arenaPulse * 10); mctx.globalAlpha = arenaPulse * 0.5;
+        mctx.lineWidth = 5 + (arenaPulse * 10); mctx.globalAlpha = arenaPulse * 0.4;
         mctx.stroke();
     }
+    mctx.restore();
 
-    // Graph
-    const gx = 450, gy = 1800, gw = 580, gh = 100;
-    mctx.fillStyle = "rgba(255,255,255,0.05)"; mctx.fillRect(gx, gy, gw, gh);
-    mctx.beginPath(); mctx.strokeStyle = cArena; mctx.lineWidth = 3;
-    for(let i=0; i<bounceHistory.length; i++) {
-        const px = gx + (i / (bounceHistory.length-1)) * gw;
-        const py = gy + gh - (bounceHistory[i] * gh);
-        if(i===0) mctx.moveTo(px, py); else mctx.lineTo(px, py);
+    // --- ESCALATION GRAPH ---
+    const gx = 100, gy = 1750, gw = 880, gh = 120;
+    mctx.save();
+    mctx.fillStyle = "rgba(255,255,255,0.05)";
+    mctx.fillRect(gx, gy, gw, gh);
+    
+    // Draw Speed Mountain
+    mctx.beginPath();
+    mctx.strokeStyle = cArena;
+    mctx.lineWidth = 4;
+    mctx.lineJoin = "round";
+    
+    // Auto-scale height based on max speed in history
+    const maxS = Math.max(40, ...speedHistory);
+    
+    for(let i=0; i<speedHistory.length; i++) {
+        const px = gx + (i / (speedHistory.length - 1)) * gw;
+        const py = gy + gh - (speedHistory[i] / maxS * gh);
+        if(i === 0) mctx.moveTo(px, py); else mctx.lineTo(px, py);
     }
     mctx.stroke();
-    mctx.fillStyle = "white"; mctx.font = "bold 50px Courier New"; mctx.textAlign="left";
-    mctx.fillText(`BOUNCES: ${bounceCount}`, 50, 1850);
+
+    // Stats
+    mctx.fillStyle = "white";
+    mctx.font = "bold 40px Courier New";
+    mctx.textAlign = "left";
+    mctx.fillText(`VELOCITY TRACKER`, gx, gy - 20);
+    mctx.textAlign = "right";
+    mctx.fillText(`HITS: ${bounceCount}`, gx + gw, gy - 20);
+    mctx.restore();
 }
 
 function loop() { update(); draw(); requestAnimationFrame(loop); }
@@ -282,7 +298,7 @@ function renderPalette() {
 }
 function addColor() { settings.palette.push('#ffffff'); renderPalette(); }
 
-// UI Sync
+// UI Wire-up
 document.getElementById('arena-grow').oninput = (e) => { settings.arenaGrowAmt = parseFloat(e.target.value); document.getElementById('v-arenagrow').innerText = settings.arenaGrowAmt; };
 document.getElementById('pulse-strength').oninput = (e) => { settings.pulseStrength = parseInt(e.target.value); document.getElementById('v-pulse').innerText = settings.pulseStrength; };
 document.getElementById('grav').oninput = (e) => { settings.gravity = parseFloat(e.target.value); document.getElementById('v-grav').innerText = settings.gravity.toFixed(2); };
@@ -296,7 +312,6 @@ document.getElementById('sync-arena').onchange = (e) => settings.syncArena = e.t
 document.getElementById('ball-stroke').oninput = (e) => settings.ballStroke = e.target.value;
 document.getElementById('stroke-width').oninput = (e) => { settings.strokeWidth = parseInt(e.target.value); document.getElementById('v-swidth').innerText = settings.strokeWidth; };
 document.getElementById('glow-power').oninput = (e) => { settings.glowPower = parseInt(e.target.value); document.getElementById('v-glow').innerText = settings.glowPower; };
-document.getElementById('cycle-speed').oninput = (e) => { settings.cycleSpeed = parseFloat(e.target.value); document.getElementById('v-cycle').innerText = settings.cycleSpeed.toFixed(3); };
 
 document.getElementById('midi-upload').onchange = (e) => {
     const reader = new FileReader();
