@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chaos Lab: Dynamic Arena</title>
+    <title>Chaos Lab: Sequential MIDI Fix</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/midi-player-js@2.0.16/browser/midiplayer.min.js"></script>
     <style>
@@ -144,7 +144,7 @@ async function unlockAudio() {
     audioDest = Tone.getContext().createMediaStreamDestination();
     synth = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: "triangle" },
-        envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 0.5 }
+        envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 0.1 }
     }).connect(audioDest).toDestination();
     document.getElementById('audio-unlock').style.display = 'none';
     resetSim(); loop();
@@ -208,7 +208,6 @@ function update() {
         ball.vx = (ball.vx - 2 * dot * nx) * settings.bounce;
         ball.vy = (ball.vy - 2 * dot * ny) * settings.bounce;
         
-        // Scale Arena
         currentArenaRadius = Math.max(100, Math.min(530, currentArenaRadius + settings.arenaGrowAmt));
 
         ball.x = centerX + nx * (currentArenaRadius - ball.radius);
@@ -217,7 +216,8 @@ function update() {
         ball.vx *= settings.speedMult; ball.vy *= settings.speedMult;
 
         if (midiNotes.length > 0) {
-            synth.triggerAttackRelease(midiNotes[noteIndex].note, "8n");
+            // Sequential play fix:
+            synth.triggerAttackRelease(midiNotes[noteIndex], "16n");
             noteIndex = (noteIndex + 1) % midiNotes.length;
         }
         ball.glow = 1;
@@ -285,13 +285,17 @@ document.getElementById('midi-upload').onchange = (e) => {
     reader.onload = (ev) => {
         const p = new MidiPlayer.Player();
         p.loadArrayBuffer(ev.target.result);
-        let events = [];
+        let noteCollector = [];
         p.getEvents().forEach(track => track.forEach(event => {
-            if (event.name === 'Note on' && event.velocity > 0) events.push({ note: event.noteName, tick: event.tick });
+            if (event.name === 'Note on' && event.velocity > 0) {
+                noteCollector.push({ note: event.noteName, tick: event.tick });
+            }
         }));
-        events.sort((a, b) => a.tick - b.tick);
-        midiNotes = events; noteIndex = 0;
-        document.getElementById('midi-status').innerText = `Loaded ${events.length} notes`;
+        // Sort strictly by time to ensure melody logic
+        noteCollector.sort((a, b) => a.tick - b.tick);
+        midiNotes = noteCollector.map(n => n.note);
+        noteIndex = 0;
+        document.getElementById('midi-status').innerText = `Loaded ${midiNotes.length} notes`;
     };
     reader.readAsArrayBuffer(e.target.files[0]);
 };
