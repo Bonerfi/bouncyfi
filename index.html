@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chaos Lab: Sequential MIDI Fix</title>
+    <title>Chaos Lab: Escape Challenge</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/midi-player-js@2.0.16/browser/midiplayer.min.js"></script>
     <style>
@@ -54,33 +54,10 @@
         <input type="range" id="pulse-strength" min="0" max="150" step="1" value="60">
     </div>
 
-    <h4>Ball & Outline</h4>
-    <div class="section">
-        <label>Outline Color <input type="color" id="ball-stroke" value="#ffffff"></label>
-        <label>Outline Thickness <span id="v-swidth">3</span></label>
-        <input type="range" id="stroke-width" min="0" max="25" step="1" value="3">
-        <label>Glow Strength <span id="v-glow">40</span></label>
-        <input type="range" id="glow-power" min="0" max="100" step="1" value="40">
-    </div>
-
-    <h4>Color Spectrum</h4>
-    <div class="section">
-        <div id="palette-list"></div>
-        <button class="btn" style="font-size: 9px; padding: 3px;" onclick="addColor()">+ Color</button>
-        <label>Cycle Speed <span id="v-cycle">0.005</span></label>
-        <input type="range" id="cycle-speed" min="0" max="0.05" step="0.001" value="0.005">
-    </div>
-
     <h4>Physics & Escalation</h4>
     <div class="section">
-        <label>Default Size <span id="v-defsize">30</span></label>
-        <input type="range" id="def-size" min="5" max="100" step="1" value="30">
-        <label>Initial Speed <span id="v-defspeed">10</span></label>
-        <input type="range" id="def-speed" min="1" max="50" step="1" value="10">
         <label>Gravity <span id="v-grav">0.30</span></label>
         <input type="range" id="grav" min="0" max="1" step="0.01" value="0.30">
-        <label>Bounciness <span id="v-bounce">0.98</span></label>
-        <input type="range" id="bounce" min="0.5" max="1.1" step="0.01" value="0.98">
         <label>Speed Mult <span id="v-speed">x1.000</span></label>
         <input type="range" id="speed-mult" min="0.95" max="1.05" step="0.001" value="1.000">
         <label>Size Inc <span id="v-grow">+0.00</span></label>
@@ -89,6 +66,7 @@
 
     <h4>Environment</h4>
     <div class="section">
+        <label style="color:var(--accent); font-weight:bold;">ESCAPE MODE <input type="checkbox" id="escape-mode"></label>
         <label>Trail Persistence <span id="v-persist">0.10</span></label>
         <input type="range" id="trail-persist" min="0" max="1" step="0.001" value="0.10">
         <label>Background <input type="color" id="bg-color" value="#050505"></label>
@@ -116,6 +94,7 @@ let currentArenaRadius = 475;
 
 let midiNotes = [], noteIndex = 0, colorTimer = 0, synth, audioDest;
 let isSimRunning = false, arenaPulse = 0;
+let escapeTimer = 3.0, lastTime = 0;
 
 const settings = {
     bgColor: '#050505',
@@ -134,7 +113,8 @@ const settings = {
     arenaColor: '#333333',
     syncArena: true,
     pulseStrength: 60,
-    arenaGrowAmt: 0
+    arenaGrowAmt: 0,
+    escapeEnabled: false
 };
 
 const ball = { x: centerX, y: centerY, vx: 0, vy: 0, radius: 30, glow: 0, currentColor: '#00f2ff' };
@@ -157,13 +137,12 @@ mainCanvas.addEventListener('mousedown', (e) => {
         const scaleY = 1920 / rect.height;
         const tapX = (e.clientX - rect.left) * scaleX;
         const tapY = (e.clientY - rect.top) * scaleY;
-        const dist = Math.sqrt((tapX - centerX)**2 + (tapY - centerY)**2);
-        if(dist < currentArenaRadius - settings.defaultSize) {
-            ball.x = tapX; ball.y = tapY;
-            ball.radius = settings.defaultSize;
-            ball.vx = settings.initialSpeed; ball.vy = settings.initialSpeed * 0.5;
-            isSimRunning = true;
-        }
+        ball.x = tapX; ball.y = tapY;
+        ball.radius = settings.defaultSize;
+        ball.vx = settings.initialSpeed; ball.vy = settings.initialSpeed * 0.5;
+        isSimRunning = true;
+        escapeTimer = 3.0;
+        lastTime = performance.now();
     }
 });
 
@@ -189,6 +168,16 @@ function lerpColor(c1, c2, t) {
 
 function update() {
     if(!isSimRunning) return;
+    
+    const now = performance.now();
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+
+    if (settings.escapeEnabled) {
+        escapeTimer -= dt;
+        if (escapeTimer <= 0) { isSimRunning = false; return; }
+    }
+
     ball.vy += settings.gravity;
     ball.x += ball.vx; ball.y += ball.vy;
 
@@ -202,29 +191,33 @@ function update() {
     const dx = ball.x - centerX, dy = ball.y - centerY;
     const dist = Math.sqrt(dx*dx + dy*dy);
 
+    // Escape Logic: Gap at top (approx -1.8 to -1.4 radians)
+    const angle = Math.atan2(dy, dx);
+    const isInGap = settings.escapeEnabled && angle > -1.8 && angle < -1.4;
+
     if (dist + ball.radius > currentArenaRadius) {
+        if (isInGap && dist > currentArenaRadius) {
+            isSimRunning = false; // Escaped!
+            return;
+        }
+
         const nx = dx / dist, ny = dy / dist;
         const dot = ball.vx * nx + ball.vy * ny;
         ball.vx = (ball.vx - 2 * dot * nx) * settings.bounce;
         ball.vy = (ball.vy - 2 * dot * ny) * settings.bounce;
-        
         currentArenaRadius = Math.max(100, Math.min(530, currentArenaRadius + settings.arenaGrowAmt));
-
         ball.x = centerX + nx * (currentArenaRadius - ball.radius);
         ball.y = centerY + ny * (currentArenaRadius - ball.radius);
         ball.radius = Math.max(5, ball.radius + settings.sizeInc);
         ball.vx *= settings.speedMult; ball.vy *= settings.speedMult;
 
         if (midiNotes.length > 0) {
-            // Sequential play fix:
             synth.triggerAttackRelease(midiNotes[noteIndex], "16n");
             noteIndex = (noteIndex + 1) % midiNotes.length;
         }
-        ball.glow = 1;
-        arenaPulse = 1;
+        ball.glow = 1; arenaPulse = 1;
     }
-    ball.glow *= 0.9;
-    arenaPulse *= 0.94;
+    ball.glow *= 0.9; arenaPulse *= 0.94;
 }
 
 function draw() {
@@ -237,24 +230,26 @@ function draw() {
         tctx.shadowBlur = ball.glow * settings.glowPower; tctx.shadowColor = settings.ballStroke;
         tctx.beginPath(); tctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI*2);
         tctx.fillStyle = ball.currentColor; tctx.fill();
-        if (settings.strokeWidth > 0) {
-            tctx.strokeStyle = settings.ballStroke;
-            tctx.lineWidth = settings.strokeWidth;
-            tctx.stroke();
-        }
         tctx.restore();
     }
 
     mctx.clearRect(0,0,1080,1920);
     const currentArenaColor = settings.syncArena ? ball.currentColor : settings.arenaColor;
+    
     mctx.save();
+    // Arena Ring (with Gap if Escape Mode)
     mctx.beginPath();
-    mctx.arc(centerX, centerY, currentArenaRadius, 0, Math.PI*2);
+    if (settings.escapeEnabled) {
+        mctx.arc(centerX, centerY, currentArenaRadius, -1.4, -1.8, false);
+    } else {
+        mctx.arc(centerX, centerY, currentArenaRadius, 0, Math.PI*2);
+    }
     mctx.strokeStyle = currentArenaColor;
     mctx.lineWidth = 15;
     mctx.globalAlpha = 0.8;
     mctx.stroke();
 
+    // Shockwave
     if (arenaPulse > 0.01) {
         mctx.beginPath();
         const pulseRadius = currentArenaRadius + ((1 - arenaPulse) * settings.pulseStrength);
@@ -263,22 +258,33 @@ function draw() {
         mctx.globalAlpha = arenaPulse * 0.5;
         mctx.stroke();
     }
+
+    // Timer Text
+    if (settings.escapeEnabled && isSimRunning) {
+        mctx.fillStyle = "white";
+        mctx.font = "bold 80px Courier New";
+        mctx.textAlign = "center";
+        mctx.fillText(escapeTimer.toFixed(2), centerX, centerY + 20);
+    }
     mctx.restore();
 }
 
 function loop() { update(); draw(); requestAnimationFrame(loop); }
 
-function renderPalette() {
-    const list = document.getElementById('palette-list');
-    list.innerHTML = '';
-    settings.palette.forEach((c, i) => {
-        const div = document.createElement('div');
-        div.className = 'color-item';
-        div.innerHTML = `<input type="color" value="${c}" oninput="settings.palette[${i}]=this.value"><button style="position:absolute;top:0;right:0;background:none;border:none;color:white;cursor:pointer;font-size:8px;" onclick="settings.palette.splice(${i},1);renderPalette()">×</button>`;
-        list.appendChild(div);
-    });
+// Controls & Logic
+document.getElementById('escape-mode').onchange = (e) => settings.escapeEnabled = e.target.checked;
+document.getElementById('arena-grow').oninput = (e) => { settings.arenaGrowAmt = parseFloat(e.target.value); document.getElementById('v-arenagrow').innerText = settings.arenaGrowAmt; };
+document.getElementById('pulse-strength').oninput = (e) => { settings.pulseStrength = parseInt(e.target.value); document.getElementById('v-pulse').innerText = settings.pulseStrength; };
+document.getElementById('trail-persist').oninput = (e) => { settings.persistence = parseFloat(e.target.value); document.getElementById('v-persist').innerText = settings.persistence.toFixed(2); };
+document.getElementById('bg-color').oninput = (e) => settings.bgColor = e.target.value;
+document.getElementById('grav').oninput = (e) => { settings.gravity = parseFloat(e.target.value); document.getElementById('v-grav').innerText = settings.gravity.toFixed(2); };
+document.getElementById('speed-mult').oninput = (e) => { settings.speedMult = parseFloat(e.target.value); document.getElementById('v-speed').innerText = 'x' + settings.speedMult.toFixed(3); };
+document.getElementById('grow-amt').oninput = (e) => { settings.sizeInc = parseFloat(e.target.value); document.getElementById('v-grow').innerText = (settings.sizeInc >= 0 ? '+' : '') + settings.sizeInc.toFixed(2); };
+
+function toggleUI() {
+    const p = document.getElementById('panel');
+    p.style.display = p.style.display === 'none' ? 'block' : 'none';
 }
-function addColor() { settings.palette.push('#ffffff'); renderPalette(); }
 
 document.getElementById('midi-upload').onchange = (e) => {
     const reader = new FileReader();
@@ -287,72 +293,18 @@ document.getElementById('midi-upload').onchange = (e) => {
         p.loadArrayBuffer(ev.target.result);
         let noteCollector = [];
         p.getEvents().forEach(track => track.forEach(event => {
-            if (event.name === 'Note on' && event.velocity > 0) {
-                noteCollector.push({ note: event.noteName, tick: event.tick });
-            }
+            if (event.name === 'Note on' && event.velocity > 0) noteCollector.push({ note: event.noteName, tick: event.tick });
         }));
-        // Sort strictly by time to ensure melody logic
         noteCollector.sort((a, b) => a.tick - b.tick);
         midiNotes = noteCollector.map(n => n.note);
-        noteIndex = 0;
         document.getElementById('midi-status').innerText = `Loaded ${midiNotes.length} notes`;
     };
     reader.readAsArrayBuffer(e.target.files[0]);
 };
 
-function toggleUI() {
-    const p = document.getElementById('panel');
-    p.style.display = p.style.display === 'none' ? 'block' : 'none';
-}
+// Simplified palette for this instance
+function addColor() { settings.palette.push('#ffffff'); }
 
-// Controls
-document.getElementById('arena-grow').oninput = (e) => { settings.arenaGrowAmt = parseFloat(e.target.value); document.getElementById('v-arenagrow').innerText = settings.arenaGrowAmt; };
-document.getElementById('arena-color').oninput = (e) => settings.arenaColor = e.target.value;
-document.getElementById('sync-arena').onchange = (e) => settings.syncArena = e.target.checked;
-document.getElementById('pulse-strength').oninput = (e) => { settings.pulseStrength = parseInt(e.target.value); document.getElementById('v-pulse').innerText = settings.pulseStrength; };
-document.getElementById('def-size').oninput = (e) => { settings.defaultSize = parseInt(e.target.value); document.getElementById('v-defsize').innerText = settings.defaultSize; if(!isSimRunning) ball.radius = settings.defaultSize; };
-document.getElementById('def-speed').oninput = (e) => { settings.initialSpeed = parseInt(e.target.value); document.getElementById('v-defspeed').innerText = settings.initialSpeed; };
-document.getElementById('ball-stroke').oninput = (e) => settings.ballStroke = e.target.value;
-document.getElementById('stroke-width').oninput = (e) => { settings.strokeWidth = parseInt(e.target.value); document.getElementById('v-swidth').innerText = settings.strokeWidth; };
-document.getElementById('glow-power').oninput = (e) => { settings.glowPower = parseInt(e.target.value); document.getElementById('v-glow').innerText = settings.glowPower; };
-document.getElementById('cycle-speed').oninput = (e) => { settings.cycleSpeed = parseFloat(e.target.value); document.getElementById('v-cycle').innerText = settings.cycleSpeed.toFixed(3); };
-document.getElementById('grav').oninput = (e) => { settings.gravity = parseFloat(e.target.value); document.getElementById('v-grav').innerText = settings.gravity.toFixed(2); };
-document.getElementById('bounce').oninput = (e) => { settings.bounce = parseFloat(e.target.value); document.getElementById('v-bounce').innerText = settings.bounce.toFixed(2); };
-document.getElementById('speed-mult').oninput = (e) => { settings.speedMult = parseFloat(e.target.value); document.getElementById('v-speed').innerText = 'x' + settings.speedMult.toFixed(3); };
-document.getElementById('grow-amt').oninput = (e) => { settings.sizeInc = parseFloat(e.target.value); document.getElementById('v-grow').innerText = (settings.sizeInc >= 0 ? '+' : '') + settings.sizeInc.toFixed(2); };
-document.getElementById('trail-persist').oninput = (e) => { settings.persistence = parseFloat(e.target.value); document.getElementById('v-persist').innerText = settings.persistence.toFixed(2); };
-document.getElementById('bg-color').oninput = (e) => settings.bgColor = e.target.value;
-
-let mediaRecorder, recordedChunks = [];
-document.getElementById('record-btn').onclick = () => {
-    if (mediaRecorder && mediaRecorder.state === "recording") {
-        mediaRecorder.stop();
-        document.getElementById('record-btn').innerText = "RENDER PRO VIDEO";
-    } else {
-        recordedChunks = [];
-        const finalCanvas = document.createElement('canvas');
-        finalCanvas.width = 1080; finalCanvas.height = 1920;
-        const fctx = finalCanvas.getContext('2d');
-        function drawFinal() {
-            fctx.drawImage(trailCanvas, 0, 0);
-            fctx.drawImage(mainCanvas, 0, 0);
-            if(mediaRecorder && mediaRecorder.state === "recording") requestAnimationFrame(drawFinal);
-        }
-        drawFinal();
-        const combined = new MediaStream([...finalCanvas.captureStream(60).getTracks(), ...audioDest.stream.getTracks()]);
-        mediaRecorder = new MediaRecorder(combined, { mimeType: 'video/webm', videoBitsPerSecond: 8000000 });
-        mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
-        mediaRecorder.onstop = () => {
-            const blob = new Blob(recordedChunks, { type: 'video/webm' });
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-            a.download = `chaos_lab_${Date.now()}.webm`; a.click();
-        };
-        mediaRecorder.start();
-        document.getElementById('record-btn').innerText = "STOP & SAVE";
-    }
-};
-
-renderPalette();
 </script>
 </body>
 </html>
