@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chaos Lab: Escape Challenge</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <title>Chaos Lab: Bounce Analytics</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Tone/14.8.49/Tone.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/midi-player-js@2.0.16/browser/midiplayer.min.js"></script>
     <style>
         :root { --accent: #00f2ff; --panel-bg: rgba(10, 10, 15, 0.98); }
@@ -22,9 +22,6 @@
         span { color: var(--accent); font-family: monospace; }
         input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
         input[type="color"] { width: 40px; height: 20px; background: #1a1a1a; border: 1px solid #333; cursor: pointer; }
-        #palette-list { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 5px; }
-        .color-item { position: relative; width: 28px; height: 28px; border-radius: 4px; border: 1px solid #444; overflow: hidden; }
-        .color-item input { position: absolute; top: -5px; left: -5px; width: 40px; height: 40px; }
         .btn { background: var(--accent); color: #000; border: none; padding: 8px; width: 100%; border-radius: 4px; font-weight: bold; cursor: pointer; margin-top: 5px; }
         .btn-rec { background: #ff4444; color: white; }
     </style>
@@ -54,10 +51,12 @@
         <input type="range" id="pulse-strength" min="0" max="150" step="1" value="60">
     </div>
 
-    <h4>Physics & Escalation</h4>
+    <h4>Ball Physics</h4>
     <div class="section">
         <label>Gravity <span id="v-grav">0.30</span></label>
         <input type="range" id="grav" min="0" max="1" step="0.01" value="0.30">
+        <label>Bounciness <span id="v-bounce">0.98</span></label>
+        <input type="range" id="bounce" min="0.5" max="1.1" step="0.01" value="0.98">
         <label>Speed Mult <span id="v-speed">x1.000</span></label>
         <input type="range" id="speed-mult" min="0.95" max="1.05" step="0.001" value="1.000">
         <label>Size Inc <span id="v-grow">+0.00</span></label>
@@ -66,7 +65,6 @@
 
     <h4>Environment</h4>
     <div class="section">
-        <label style="color:var(--accent); font-weight:bold;">ESCAPE MODE <input type="checkbox" id="escape-mode"></label>
         <label>Trail Persistence <span id="v-persist">0.10</span></label>
         <input type="range" id="trail-persist" min="0" max="1" step="0.001" value="0.10">
         <label>Background <input type="color" id="bg-color" value="#050505"></label>
@@ -94,7 +92,8 @@ let currentArenaRadius = 475;
 
 let midiNotes = [], noteIndex = 0, colorTimer = 0, synth, audioDest;
 let isSimRunning = false, arenaPulse = 0;
-let escapeTimer = 3.0, lastTime = 0;
+let bounceCount = 0;
+let bounceHistory = new Array(100).fill(0); // For graph
 
 const settings = {
     bgColor: '#050505',
@@ -113,8 +112,7 @@ const settings = {
     arenaColor: '#333333',
     syncArena: true,
     pulseStrength: 60,
-    arenaGrowAmt: 0,
-    escapeEnabled: false
+    arenaGrowAmt: 0
 };
 
 const ball = { x: centerX, y: centerY, vx: 0, vy: 0, radius: 30, glow: 0, currentColor: '#00f2ff' };
@@ -135,24 +133,23 @@ mainCanvas.addEventListener('mousedown', (e) => {
         const rect = mainCanvas.getBoundingClientRect();
         const scaleX = 1080 / rect.width;
         const scaleY = 1920 / rect.height;
-        const tapX = (e.clientX - rect.left) * scaleX;
-        const tapY = (e.clientY - rect.top) * scaleY;
-        ball.x = tapX; ball.y = tapY;
+        ball.x = (e.clientX - rect.left) * scaleX;
+        ball.y = (e.clientY - rect.top) * scaleY;
         ball.radius = settings.defaultSize;
         ball.vx = settings.initialSpeed; ball.vy = settings.initialSpeed * 0.5;
         isSimRunning = true;
-        escapeTimer = 3.0;
-        lastTime = performance.now();
+        bounceCount = 0;
     }
 });
 
 function resetSim() {
-    isSimRunning = false; arenaPulse = 0;
+    isSimRunning = false; arenaPulse = 0; bounceCount = 0;
     currentArenaRadius = 475;
     ball.x = centerX; ball.y = centerY; ball.vx = 0; ball.vy = 0;
     ball.radius = settings.defaultSize; noteIndex = 0;
     tctx.fillStyle = settings.bgColor; tctx.fillRect(0, 0, 1080, 1920);
     mctx.clearRect(0,0,1080,1920);
+    bounceHistory.fill(0);
 }
 
 function hexToRgb(hex) {
@@ -168,18 +165,12 @@ function lerpColor(c1, c2, t) {
 
 function update() {
     if(!isSimRunning) return;
-    
-    const now = performance.now();
-    const dt = (now - lastTime) / 1000;
-    lastTime = now;
-
-    if (settings.escapeEnabled) {
-        escapeTimer -= dt;
-        if (escapeTimer <= 0) { isSimRunning = false; return; }
-    }
-
     ball.vy += settings.gravity;
     ball.x += ball.vx; ball.y += ball.vy;
+
+    // Shift graph
+    bounceHistory.push(0);
+    bounceHistory.shift();
 
     if (settings.palette.length > 1) {
         colorTimer += settings.cycleSpeed;
@@ -191,21 +182,14 @@ function update() {
     const dx = ball.x - centerX, dy = ball.y - centerY;
     const dist = Math.sqrt(dx*dx + dy*dy);
 
-    // Escape Logic: Gap at top (approx -1.8 to -1.4 radians)
-    const angle = Math.atan2(dy, dx);
-    const isInGap = settings.escapeEnabled && angle > -1.8 && angle < -1.4;
-
     if (dist + ball.radius > currentArenaRadius) {
-        if (isInGap && dist > currentArenaRadius) {
-            isSimRunning = false; // Escaped!
-            return;
-        }
-
         const nx = dx / dist, ny = dy / dist;
         const dot = ball.vx * nx + ball.vy * ny;
         ball.vx = (ball.vx - 2 * dot * nx) * settings.bounce;
         ball.vy = (ball.vy - 2 * dot * ny) * settings.bounce;
+        
         currentArenaRadius = Math.max(100, Math.min(530, currentArenaRadius + settings.arenaGrowAmt));
+
         ball.x = centerX + nx * (currentArenaRadius - ball.radius);
         ball.y = centerY + ny * (currentArenaRadius - ball.radius);
         ball.radius = Math.max(5, ball.radius + settings.sizeInc);
@@ -215,12 +199,17 @@ function update() {
             synth.triggerAttackRelease(midiNotes[noteIndex], "16n");
             noteIndex = (noteIndex + 1) % midiNotes.length;
         }
-        ball.glow = 1; arenaPulse = 1;
+        ball.glow = 1;
+        arenaPulse = 1;
+        bounceCount++;
+        bounceHistory[bounceHistory.length-1] = 1; // Mark hit in graph
     }
-    ball.glow *= 0.9; arenaPulse *= 0.94;
+    ball.glow *= 0.9;
+    arenaPulse *= 0.94;
 }
 
 function draw() {
+    // 1. Trail Layer
     const rgb = hexToRgb(settings.bgColor);
     tctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${settings.persistence})`;
     tctx.fillRect(0, 0, 1080, 1920);
@@ -233,17 +222,14 @@ function draw() {
         tctx.restore();
     }
 
+    // 2. Main Layer (UI & Arena)
     mctx.clearRect(0,0,1080,1920);
     const currentArenaColor = settings.syncArena ? ball.currentColor : settings.arenaColor;
     
+    // Arena
     mctx.save();
-    // Arena Ring (with Gap if Escape Mode)
     mctx.beginPath();
-    if (settings.escapeEnabled) {
-        mctx.arc(centerX, centerY, currentArenaRadius, -1.4, -1.8, false);
-    } else {
-        mctx.arc(centerX, centerY, currentArenaRadius, 0, Math.PI*2);
-    }
+    mctx.arc(centerX, centerY, currentArenaRadius, 0, Math.PI*2);
     mctx.strokeStyle = currentArenaColor;
     mctx.lineWidth = 15;
     mctx.globalAlpha = 0.8;
@@ -258,33 +244,46 @@ function draw() {
         mctx.globalAlpha = arenaPulse * 0.5;
         mctx.stroke();
     }
+    mctx.restore();
 
-    // Timer Text
-    if (settings.escapeEnabled && isSimRunning) {
-        mctx.fillStyle = "white";
-        mctx.font = "bold 80px Courier New";
-        mctx.textAlign = "center";
-        mctx.fillText(escapeTimer.toFixed(2), centerX, centerY + 20);
+    // --- Graph & UI ---
+    mctx.save();
+    // Counter
+    mctx.fillStyle = "white";
+    mctx.font = "bold 50px Courier New";
+    mctx.textAlign = "left";
+    mctx.fillText(`BOUNCES: ${bounceCount}`, 50, 1850);
+
+    // Graph Background
+    const gx = 450, gy = 1800, gw = 580, gh = 100;
+    mctx.fillStyle = "rgba(255,255,255,0.05)";
+    mctx.fillRect(gx, gy, gw, gh);
+    
+    // Graph Line
+    mctx.beginPath();
+    mctx.strokeStyle = currentArenaColor;
+    mctx.lineWidth = 3;
+    for(let i=0; i < bounceHistory.length; i++) {
+        const px = gx + (i / (bounceHistory.length - 1)) * gw;
+        const py = gy + gh - (bounceHistory[i] * gh);
+        if(i===0) mctx.moveTo(px, py); else mctx.lineTo(px, py);
     }
+    mctx.stroke();
     mctx.restore();
 }
 
 function loop() { update(); draw(); requestAnimationFrame(loop); }
 
-// Controls & Logic
-document.getElementById('escape-mode').onchange = (e) => settings.escapeEnabled = e.target.checked;
-document.getElementById('arena-grow').oninput = (e) => { settings.arenaGrowAmt = parseFloat(e.target.value); document.getElementById('v-arenagrow').innerText = settings.arenaGrowAmt; };
-document.getElementById('pulse-strength').oninput = (e) => { settings.pulseStrength = parseInt(e.target.value); document.getElementById('v-pulse').innerText = settings.pulseStrength; };
-document.getElementById('trail-persist').oninput = (e) => { settings.persistence = parseFloat(e.target.value); document.getElementById('v-persist').innerText = settings.persistence.toFixed(2); };
-document.getElementById('bg-color').oninput = (e) => settings.bgColor = e.target.value;
-document.getElementById('grav').oninput = (e) => { settings.gravity = parseFloat(e.target.value); document.getElementById('v-grav').innerText = settings.gravity.toFixed(2); };
-document.getElementById('speed-mult').oninput = (e) => { settings.speedMult = parseFloat(e.target.value); document.getElementById('v-speed').innerText = 'x' + settings.speedMult.toFixed(3); };
-document.getElementById('grow-amt').oninput = (e) => { settings.sizeInc = parseFloat(e.target.value); document.getElementById('v-grow').innerText = (settings.sizeInc >= 0 ? '+' : '') + settings.sizeInc.toFixed(2); };
-
+// Simplified Logic and UI Controls
 function toggleUI() {
     const p = document.getElementById('panel');
     p.style.display = p.style.display === 'none' ? 'block' : 'none';
 }
+
+document.getElementById('arena-grow').oninput = (e) => { settings.arenaGrowAmt = parseFloat(e.target.value); document.getElementById('v-arenagrow').innerText = settings.arenaGrowAmt; };
+document.getElementById('grav').oninput = (e) => { settings.gravity = parseFloat(e.target.value); document.getElementById('v-grav').innerText = settings.gravity.toFixed(2); };
+document.getElementById('trail-persist').oninput = (e) => { settings.persistence = parseFloat(e.target.value); document.getElementById('v-persist').innerText = settings.persistence.toFixed(2); };
+document.getElementById('bg-color').oninput = (e) => settings.bgColor = e.target.value;
 
 document.getElementById('midi-upload').onchange = (e) => {
     const reader = new FileReader();
@@ -302,9 +301,34 @@ document.getElementById('midi-upload').onchange = (e) => {
     reader.readAsArrayBuffer(e.target.files[0]);
 };
 
-// Simplified palette for this instance
-function addColor() { settings.palette.push('#ffffff'); }
-
+let mediaRecorder, recordedChunks = [];
+document.getElementById('record-btn').onclick = () => {
+    if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+        document.getElementById('record-btn').innerText = "RENDER PRO VIDEO";
+    } else {
+        recordedChunks = [];
+        const finalCanvas = document.createElement('canvas');
+        finalCanvas.width = 1080; finalCanvas.height = 1920;
+        const fctx = finalCanvas.getContext('2d');
+        function drawFinal() {
+            fctx.drawImage(trailCanvas, 0, 0);
+            fctx.drawImage(mainCanvas, 0, 0);
+            if(mediaRecorder && mediaRecorder.state === "recording") requestAnimationFrame(drawFinal);
+        }
+        drawFinal();
+        const combined = new MediaStream([...finalCanvas.captureStream(60).getTracks(), ...audioDest.stream.getTracks()]);
+        mediaRecorder = new MediaRecorder(combined, { mimeType: 'video/webm', videoBitsPerSecond: 8000000 });
+        mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+            a.download = `chaos_lab_stats_${Date.now()}.webm`; a.click();
+        };
+        mediaRecorder.start();
+        document.getElementById('record-btn').innerText = "STOP & SAVE";
+    }
+};
 </script>
 </body>
 </html>
